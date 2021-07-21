@@ -24,10 +24,12 @@ def get_number(n, target, numbers):
 
 def create_resource_distribution(n_resources, numbers):
     numbers_taken = []
-    for i in range(n_resources):
-        x = get_number(numbers_taken, (0.3222 + random.uniform(-0.1, 0.1)) * (i + 1)/4, numbers)
-        numbers.remove(x)
+    for _ in range(n_resources - 1):
+        x = numbers.pop(0)
         numbers_taken.append(x)
+    x = get_number(numbers_taken, 0.3222, numbers)
+    numbers.remove(x)
+    numbers_taken.append(x)
     return numbers_taken
 
 def distance(p1, p2):
