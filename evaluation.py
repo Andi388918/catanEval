@@ -4,8 +4,13 @@ import copy
 from collections import defaultdict
 
 def probability(number):
-    x = 1 / 36 * min(number - 1, 13 - number)
-    return x * 12 / 7
+    x = 0
+    if type(number) == list:
+        for n in number:
+            x += 1 / 36 * min(n - 1, 13 - n)
+    else:
+        x = 1 / 36 * min(number - 1, 13 - number)
+    return x
 
 def calculate_expected_payoff(targets, income_per_round):
     expected_payoff = {}

@@ -36,7 +36,7 @@ class Board:
         board_loader.save_board(self.settlement_places, self.road_places, self.hexagons)
         # import sys; sys.exit()
 
-        generator.init_hexagons(self.hexagons, self.settlement_places)
+        generator.init_hexagons(self.hexagons, self.settlement_places, self.road_places, self.fish_pieces)
         self.robber = Robber()
 
         self.buildable_settlement_places = defaultdict(set)

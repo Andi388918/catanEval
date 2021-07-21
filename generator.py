@@ -1,4 +1,5 @@
 import copy
+from encoder import hexagons_to_string
 from random import shuffle
 from infrastructure import Fish_Piece, Road_Place, Settlement_Place, Harbor, Harbor_Piece, Road, Settlement
 import numpy as np
@@ -9,76 +10,52 @@ import random
 from bank import Bank
 import math
 from evaluation import probability
+import drawing
 
 RESOURCES = ['getreide', 'getreide', 'getreide', 'getreide', 'holz', 'holz', 'holz', 'holz', 'lehm', 'lehm', 'lehm', 'schaf', 'schaf', 'schaf', 'schaf', 'stein', 'stein', 'stein']
 NUMBERS = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12]
 
-RESOURCES = RESOURCES[::-1]
-NUMBERS = NUMBERS[::-1]
+def get_number(n, target, numbers):
+    total_prob = sum([probability(x) for x in n])                                   # calculate value of current place
+    probabilities = [probability(x) + total_prob for x in numbers]                  # add value of numbers to current place
+    deltas = [abs(prob - target) for prob in probabilities]                         # see which number's probability is closest to target
+    deltas = [math.inf if numbers[i] in n else d for (i, d) in enumerate(deltas)]   # filter same numbers
+    return numbers[deltas.index(min(deltas))] 
+
+def create_resource_distribution(n_resources, numbers):
+    numbers_taken = []
+    for i in range(n_resources):
+        x = get_number(numbers_taken, (0.3222 + random.uniform(-0.1, 0.1)) * (i + 1)/4, numbers)
+        numbers.remove(x)
+        numbers_taken.append(x)
+    return numbers_taken
 
 def distance(p1, p2):
     return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
 
-def calculate_probability(hexagons):
-    p = 0
+def resource_in_hexagons(resource, hexagons):
     for hexagon in hexagons:
-        if hexagon.number is not None:
-            if type(hexagon.number) == list:
-                for number in hexagon.number:
-                    p += probability(number)
-            else:
-                p += probability(hexagon.number)
-    return p
+        if hexagon.resource and hexagon.resource == resource:
+            return True
+    return False
 
-def find_number_with_probability(p, numbers, target):
-    probabilities = []
-    for number in numbers:
-        probabilities.append(p + probability(number))
-    i = probabilities.index(min(probabilities, key=lambda x:abs(x-target)))
-    return numbers[i]
+def red_number_in_hexagons(hexagons):
+    for hexagon in hexagons:
+        if hexagon.number in [6, 8]:
+            return True
+    return False
 
-def unnumbered_hexagons(hexagons):
-    return [hexagon for hexagon in hexagons if hexagon.number is None]
+def different_resource(resource_number_distribution_t, neighbours):
+    for x in resource_number_distribution_t:
+        if not resource_in_hexagons(x[0], neighbours):
+            if not (x[1] in [6, 8] and red_number_in_hexagons(neighbours)):
+                return x
+    return resource_number_distribution_t[0]
 
-def unresourced_hexagons(hexagons):
-    return [hexagon for hexagon in hexagons if hexagon.resource is None]
-
-def calculate_number(hexagons, numbers):
-    unnumbered = unnumbered_hexagons(hexagons)
-    if len(unnumbered) == 2:
-        return numbers[0]
-    elif len(unnumbered) == 1:
-        p = calculate_probability(hexagons)
-        number = find_number_with_probability(p, numbers, 0.3)
-        return number
-    elif len(unnumbered) == 0:
-        p = calculate_probability(hexagons)
-        number = find_number_with_probability(p, numbers, 0.5)
-        return number
-
-def different_resource(x, resources):
-    for resource in resources:
-        if resource not in x:
-            return resource
-    return resources[0]
-
-def calculate_resource(hexagons, resources):
-    unresourced = unresourced_hexagons(hexagons)
-    if len(unresourced) == 2:
-        return resources[0]
-    elif len(unresourced) == 1:
-        resource = different_resource([x.resource for x in hexagons], resources)
-        return resource
-    elif len(unresourced) == 0:
-        resource = different_resource([x.resource for x in hexagons], resources)
-        return resource
-
-def init_hexagons(hexagons, settlement_places):
+def init_hexagons(hexagons, settlement_places, road_places, fish_pieces):
 
     resources = copy.deepcopy(RESOURCES)
     shuffle(resources)
-    numbers = copy.deepcopy(NUMBERS)
-    shuffle(numbers)
 
     possible_lake_indexes = [4, 5, 8, 10, 13, 14]
     lake_index = random.choice(possible_lake_indexes)
@@ -88,17 +65,38 @@ def init_hexagons(hexagons, settlement_places):
             hexagon.resource = "fisch"
             hexagon.number = [2, 3, 11, 12]
 
-    for settlement_place in settlement_places:
-        if len(settlement_place.bordersOn) == 3:
-            for hexagon in settlement_place.bordersOn:
-                if hexagon.number is None and hexagon.resource != "fisch":
-                    n = calculate_number([h for h in settlement_place.bordersOn if h != hexagon], numbers)
-                    numbers.remove(n)
-                    hexagon.number = n
-                if hexagon.resource is None:
-                    r = calculate_resource([h for h in settlement_place.bordersOn if h != hexagon], resources)
-                    resources.remove(r)
-                    hexagon.resource = r
+    # hexagon initialization start
+
+    numbers = copy.deepcopy(NUMBERS)
+    shuffle(numbers)
+
+    resource_number_distribution = {'getreide': create_resource_distribution(4, numbers),
+                                    'schaf': create_resource_distribution(4, numbers),
+                                    'holz': create_resource_distribution(4, numbers),
+                                    'lehm': create_resource_distribution(3, numbers),
+                                    'stein': create_resource_distribution(3, numbers)}
+
+    print(resource_number_distribution)
+
+    resource_number_distribution_t = []
+    for resource, n in resource_number_distribution.items():
+        for x in n:
+            resource_number_distribution_t.append((resource, x))
+
+    shuffle(resource_number_distribution_t)
+
+    for hexagon in hexagons:
+        if hexagon.resource is None:
+            neighbours = hexagon.hexagon_neighbours
+
+            x = different_resource(resource_number_distribution_t, neighbours)
+            hexagon.resource = x[0]
+            hexagon.number = x[1]
+            resource_number_distribution_t.remove(x)
+
+            drawing.draw(hexagons, settlement_places, road_places, fish_pieces)
+
+    # hexagon initialization end
 
 def init_hexagons_save(hexagons, resources, numbers):
     for hexagon in hexagons:
@@ -223,6 +221,16 @@ def append_neighbour(r, s):
         s.neighbours.append(r)
         r.neighbours.append(s)
 
+def make_hexagon_neighbours(index, deltaY, deltaX, matrix, hexagon):
+    index_valid = index_exists(index[0] + deltaY, index[1] + deltaX, matrix)
+    if index_valid:
+        neighbour = matrix[index[0] + deltaY][index[1] + deltaX]
+        if type(neighbour) == Hexagon:
+            if neighbour not in hexagon.hexagon_neighbours:
+                hexagon.hexagon_neighbours.append(neighbour)
+            if hexagon not in neighbour.hexagon_neighbours:
+                neighbour.hexagon_neighbours.append(hexagon)
+
 def make_neighbours(index, deltaY, deltaX, matrix, element, hexagon = False, settlement = False, road = False):
     index_valid = index_exists(index[0] + deltaY, index[1] + deltaX, matrix)
     if index_valid:
@@ -240,7 +248,7 @@ def make_neighbours(index, deltaY, deltaX, matrix, element, hexagon = False, set
         else:
             append_neighbour(neighbour, element)
 
-def neighbours(matrix, settlement_places, road_places):
+def neighbours(matrix, settlement_places, road_places, hexagons):
 
     for element in settlement_places:
         index = np.where(matrix == element)
@@ -281,6 +289,18 @@ def neighbours(matrix, settlement_places, road_places):
         make_neighbours(index, 2, 1, matrix, element, False, False, True)
         make_neighbours(index, 0, 2, matrix, element, False, False, True)
         make_neighbours(index, 0, -2, matrix, element, False, False, True)
+
+    for element in hexagons:
+        index = np.where(matrix == element)
+        index = [index[0][0], index[1][0]]
+
+        # hexagon neighbours
+        make_hexagon_neighbours(index, -4, -2, matrix, element)
+        make_hexagon_neighbours(index, -4, 2, matrix, element)
+        make_hexagon_neighbours(index, 4, -2, matrix, element)
+        make_hexagon_neighbours(index, 4, 2, matrix, element)
+        make_hexagon_neighbours(index, 0, -4, matrix, element)
+        make_hexagon_neighbours(index, 0, 4, matrix, element)
 
 def make_harbor(settlement, previous, start, harbors, counter, fish_pieces_indexes, fish_pieces):
 
@@ -339,7 +359,7 @@ def make_harbors(matrix):
 
 def create_matrix():
     matrix, settlement_places, road_places, hexagons = make_graph()
-    neighbours(matrix, settlement_places, road_places)
+    neighbours(matrix, settlement_places, road_places, hexagons)
     fish_pieces = make_harbors(matrix)
     return settlement_places, road_places, hexagons, fish_pieces
 

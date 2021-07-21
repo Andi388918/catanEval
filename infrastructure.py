@@ -15,7 +15,7 @@ class Infrastructure_Place:
         self.matrix_pos = matrix_pos
     def draw(self, screen, color = (0, 0, 0)):
         self.area = pygame.Rect(self.position[0] - 5, self.position[1] - 5, 10, 10)
-        pygame.draw.rect(screen, color, self.area)
+        # pygame.draw.rect(screen, color, self.area)
         if self.occupiedBy:
             self.occupiedBy.draw(screen)
 
@@ -27,8 +27,19 @@ class Settlement_Place(Infrastructure_Place):
         self.settlement_neighbours = []
         self.fish_piece = fish_piece
 
+    def get_prob(self):
+        p = 0
+        for h in self.bordersOn:
+            if h.number:
+                if type(h.number) == list:
+                    for n in h.number:
+                        p += evaluation.probability(n)
+                else:
+                    p += evaluation.probability(h.number)
+        return p
+
     def __repr__(self):
-        return str(self.index)
+        return str(self.get_prob())
 
 class Road_Place(Infrastructure_Place):
     def __init__(self, position, index, matrix_pos, rotation):
@@ -38,20 +49,14 @@ class Road_Place(Infrastructure_Place):
         self.infrastructures_possible = [Road]
 
     def __repr__(self):
-        r = "Road_Place:\n"
-        r += f"index: {self.index}\n"
-        r += f"bordersOn: {self.bordersOn}\n"
-        r += f"settlement neighbours: {len(self.neighbours)}\n"
-        r += f"road neighbours: {len(self.road_neighbours)}\n"
-        r += f"occupiedBy: {self.occupiedBy}\n"
-        return r
+        return "R"
 
 class Harbor:
     def __init__(self, resource = None, trade = None):
         self.resource = resource
         self.trade = trade
     def __repr__(self):
-        return f"{self.resource}, {self.trade}"
+        return "H"
 
 class Fish_Piece:
     def __init__(self, number, position, rotation):

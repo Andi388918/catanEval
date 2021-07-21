@@ -58,19 +58,19 @@ def play_games(games = 100, print_every = False, draw = False):
             max_index_list = max_index_list[0:7]
 
         for m in max_index_list:
-            print(m)
+            print(m.index)
         print("")
 
         for settlement_place, eval in evaluations.items():
-            print(f"{settlement_place}:")
+            print(f"{settlement_place.index}:")
             for i, v in eval.items():
-                print(i, v)
+                print(i.index, v)
             print("")
 
         while not won:
             steps += 1
             if draw:
-                drawing.draw(board)
+                drawing.draw(board.hexagons, board.settlement_places, board.road_places, board.fish_pieces, board.buildable_road_places, board.robber)
 
             # actions = board.get_actions()
             # action = random.choice(tuple(actions))
